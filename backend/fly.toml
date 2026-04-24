@@ -1,0 +1,21 @@
+app = "algo-multi-agent"
+primary_region = "sin"
+
+[build]
+  dockerfile = "backend/Dockerfile"
+
+[processes]
+  app = "python agent.py start"
+
+[env]
+  PYTHONUNBUFFERED = "1"
+  LOG_LEVEL = "INFO"
+  OPENROUTER_MODEL = "google/gemini-flash-1.5"
+  GOOGLE_STT_MODEL = "latest_long"
+  GOOGLE_TTS_LANGUAGE = "en-US"
+  GOOGLE_TTS_RATE = "1.03"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 1024

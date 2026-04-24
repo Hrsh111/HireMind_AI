@@ -1,0 +1,14 @@
+{
+  "framework": "nextjs",
+  "functions": {
+    "app/api/execute/route.ts": {
+      "maxDuration": 15
+    },
+    "app/api/parse-resume/route.ts": {
+      "maxDuration": 15
+    },
+    "app/api/livekit-token/route.ts": {
+      "maxDuration": 10
+    }
+  }
+}

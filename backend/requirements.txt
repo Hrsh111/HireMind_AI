@@ -1,0 +1,8 @@
+livekit-agents
+livekit
+livekit-plugins-silero
+livekit-plugins-google
+langgraph
+python-dotenv
+httpx
+psycopg[binary]

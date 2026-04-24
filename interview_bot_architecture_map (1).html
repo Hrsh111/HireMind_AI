@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interview Bot Architecture Map</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root{
+      --bg:#0b1020;
+      --panel:#11182b;
+      --panel-2:#0f172a;
+      --text:#e5e7eb;
+      --muted:#94a3b8;
+      --accent:#60a5fa;
+      --border:#24324f;
+      --code:#0b1220;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #121a31 0%, var(--bg) 60%);
+      color:var(--text);
+      line-height:1.55;
+    }
+    .wrap{
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 32px 20px 56px;
+    }
+    .hero{
+      background: linear-gradient(180deg, rgba(96,165,250,.12), rgba(167,139,250,.06));
+      border: 1px solid rgba(148,163,184,.18);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+      margin-bottom: 24px;
+    }
+    h1{
+      margin: 0 0 8px;
+      font-size: 2rem;
+      letter-spacing: -.02em;
+    }
+    .subtitle{
+      color: var(--muted);
+      margin: 0;
+      max-width: 980px;
+    }
+    .section{
+      background: rgba(15,23,42,.78);
+      border: 1px solid rgba(148,163,184,.14);
+      border-radius: 24px;
+      padding: 20px;
+      margin-top: 20px;
+      box-shadow: 0 16px 40px rgba(0,0,0,.18);
+    }
+    h2{
+      margin: 0 0 14px;
+      font-size: 1.25rem;
+      color: #dbeafe;
+    }
+    .diagram{
+      background: linear-gradient(180deg, rgba(11,18,32,.92), rgba(11,18,32,.82));
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 16px;
+      overflow-x: auto;
+    }
+    .mermaid{
+      min-width: 1120px;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .card{
+      background: rgba(18,26,49,.92);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+    }
+    .card h3{
+      margin: 0 0 8px;
+      font-size: 1rem;
+      color: #bfdbfe;
+    }
+    .file{
+      display:inline-block;
+      background: rgba(96,165,250,.14);
+      color:#dbeafe;
+      border:1px solid rgba(96,165,250,.25);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: .82rem;
+      margin-bottom: 8px;
+    }
+    .small{
+      color: var(--muted);
+      font-size: .95rem;
+    }
+    code{
+      background: var(--code);
+      border: 1px solid rgba(148,163,184,.15);
+      padding: 2px 6px;
+      border-radius: 8px;
+      color: #dbeafe;
+    }
+    .legend{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: .92rem;
+    }
+    .pill{
+      border:1px solid rgba(148,163,184,.18);
+      background: rgba(255,255,255,.03);
+      border-radius:999px;
+      padding:6px 10px;
+    }
+    .note{
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: .95rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <h1>Interview Bot Architecture Map</h1>
+      <p class="subtitle">
+        This file contains two clean Mermaid diagrams: one for the overall project architecture and one for the LangGraph state machine. Every transition is labelled with the file name that owns or influences that step.
+      </p>
+      <div class="legend">
+        <span class="pill">Local engine: <code>main.py</code> → <code>interviewer.py</code></span>
+        <span class="pill">Shared core: <code>context_parser.py</code>, <code>llm.py</code>, <code>prompts.py</code>, <code>report_generator.py</code>, <code>storage.py</code></span>
+        <span class="pill">Panel branch: <code>agent.py</code>, <code>agent 2.py</code>, <code>openrouter_client.py</code></span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>System architecture</h2>
+      <div class="diagram">
+        <div class="mermaid">
+flowchart LR
+  U[User: JD + Resume + Answers] -->|main.py| M[main.py]
+  M -->|builds Interviewer| I[interviewer.py]
+
+  subgraph Shared[Shared services]
+    CP[context_parser.py]
+    L[llm.py]
+    P[prompts.py]
+    R[report_generator.py]
+    C[config.py]
+    ST[storage.py]
+    V[voice.py]
+    W[watcher.py]
+    UI[ui.py]
+  end
+
+  I -->|parse_interview_context| CP
+  CP -->|LLMClient| L
+  CP -->|question templates| P
+  I -->|system prompt templates| P
+  I -->|chat + streaming| L
+  I -->|final report| R
+  R -->|LLMClient for scoring| L
+  I -->|speak / listen| V
+  I -->|file change events| W
+  I -->|terminal rendering| UI
+  L -->|model + backend settings| C
+  V -->|audio settings| C
+  W -->|watch rules| C
+  M -->|backend selection| C
+  M -->|session persistence| ST
+
+  subgraph Panel[Live multi-agent branch]
+    AG[agent.py]
+    AG2[agent 2.py]
+    OR[openrouter_client.py]
+  end
+
+  AG -->|build_graph + routing| OR
+  AG -->|session memory| ST
+  AG2 -->|alternate flow| OR
+  AG2 -->|session persistence| ST
+  OR -->|LLM requests| L
+  OR -->|model selection| C
+
+  I -.->|migration target| AG
+  I -.->|shared prompt patterns| P
+  R -.->|structured output| ST
+  CP -.->|competency extraction| ST
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <span class="file">main.py → interviewer.py</span>
+          <h3>Session bootstrap</h3>
+          <p class="small">
+            <code>main.py</code> reads CLI flags, loads the JD and resume, chooses the backend, and constructs the interviewer object. This is the session entry point.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="file">interviewer.py → context_parser.py</span>
+          <h3>Interview context</h3>
+          <p class="small">
+            The interviewer hands JD and resume text to <code>context_parser.py</code> so the system can infer competencies, tailor the question, and avoid generic prompts.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="file">context_parser.py → llm.py</span>
+          <h3>LLM-based parsing</h3>
+          <p class="small">
+            The parser relies on <code>LLMClient</code> for structured extraction. That keeps the parsing logic reusable and isolated from the flow controller.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="file">interviewer.py → prompts.py</span>
+          <h3>Prompt management</h3>
+          <p class="small">
+            <code>prompts.py</code> owns the system prompt, greeting, question, hint, and observation templates. This lets you tune interview behavior without editing state-machine logic.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="file">interviewer.py → llm.py</span>
+          <h3>Conversation engine</h3>
+          <p class="small">
+            The interviewer delegates response generation and streaming to the model client. The flow decides when to speak; <code>llm.py</code> decides what to say.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="file">interviewer.py → report_generator.py</span>
+          <h3>Final evaluation</h3>
+          <p class="small">
+            At the end of the session, the transcript and final code are pushed into <code>report_generator.py</code> to create a structured, explainable PDF.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="file">agent.py / agent 2.py → openrouter_client.py</span>
+          <h3>Panel branch</h3>
+          <p class="small">
+            The LangGraph / LiveKit branch routes node-level decisions through <code>openrouter_client.py</code>. That is the natural home for your moderator, specialist agents, and routing logic.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="file">agent.py / agent 2.py → storage.py</span>
+          <h3>Session memory</h3>
+          <p class="small">
+            Both agent files should write session events, weak areas, and scores to <code>storage.py</code>. That gives the system memory across turns and supports analytics.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>LangGraph state machine</h2>
+      <div class="diagram">
+        <div class="mermaid">
+flowchart TD
+  START[Start Session] -->|JD + Resume| PLANNER[Planner Node]
+  PLANNER -->|competencies + interview plan| MODERATOR[Moderator Node]
+
+  MODERATOR -->|route: dsa| DSA[DSA Agent]
+  MODERATOR -->|route: system| SYSTEM[System Design Agent]
+  MODERATOR -->|route: behavioral| BEHAVIORAL[Behavioral Agent]
+
+  DSA -->|ask question| USER[User Response]
+  SYSTEM -->|ask question| USER
+  BEHAVIORAL -->|ask question| USER
+
+  USER -->|response text| EVALUATOR[Evaluator Node]
+  EVALUATOR -->|depth + score + gaps| TRACKER[Tracker Node]
+
+  TRACKER -->|continue| MODERATOR
+  TRACKER -->|switch topic| MODERATOR
+  TRACKER -->|end| END[End Session]
+
+  END -->|generate| REPORT[Final Report]
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <span class="file">Planner Node</span>
+          <h3>Builds the session plan</h3>
+          <p class="small">
+            This node turns resume + JD into competencies and a plan of attack. It is the bridge between raw input and a role-specific interview flow.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="file">Moderator Node</span>
+          <h3>Chooses the next speaker</h3>
+          <p class="small">
+            The moderator is the brain of the graph. It decides which interviewer should speak next and why, based on the current state and weak areas.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="file">DSA / System / Behavioral Agents</span>
+          <h3>Specialist questioners</h3>
+          <p class="small">
+            Each specialist asks one focused question and keeps the conversation on its own domain. This is what turns the system into a true panel.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="file">Evaluator Node</span>
+          <h3>Scores the answer</h3>
+          <p class="small">
+            The evaluator classifies the response depth, assigns a score, and captures evidence or gaps. That signal drives the next step.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="file">Tracker Node</span>
+          <h3>Controls the loop</h3>
+          <p class="small">
+            The tracker decides whether to continue, switch topic, or end the interview. It is what makes the flow adaptive rather than linear.
+          </p>
+        </div>
+
+        <div class="card">
+          <span class="file">End Session → Final Report</span>
+          <h3>Explainable output</h3>
+          <p class="small">
+            Once the tracker ends the session, the system generates the final report. This is where the interview becomes a product artifact instead of just a chat log.
+          </p>
+        </div>
+      </div>
+
+      <p class="note">
+        This second diagram is the one to use when you want to reason about LangGraph nodes, state transitions, and the exact loop that makes the panel adaptive.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "dark",
+      securityLevel: "loose",
+      flowchart: { curve: "basis", useMaxWidth: true, htmlLabels: false }
+    });
+  </script>
+</body>
+</html>

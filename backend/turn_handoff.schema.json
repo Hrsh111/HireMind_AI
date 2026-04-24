@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TurnHandoffMessage",
+  "type": "object",
+  "properties": {
+    "turn_id": { "type": "string" },
+    "speaker": { "type": "string" },
+    "question_id": { "type": "string" },
+    "question_text": { "type": "string" },
+    "answer": { "type": "string" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "score": { "type": "number" },
+    "evidence": { "type": "string" },
+    "low_confidence": { "type": "boolean" },
+    "next_speaker": { "type": "string" },
+    "phase": { "type": "string" }
+  },
+  "required": ["turn_id", "speaker", "question_id", "question_text", "answer", "timestamp", "phase"]
+}
