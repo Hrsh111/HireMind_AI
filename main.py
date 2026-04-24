@@ -21,12 +21,12 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Examples:
-  python main.py                                  Start (uses Groq if GROQ_API_KEY set)
-  GROQ_API_KEY=gsk_... python main.py             Pass API key inline
-  python main.py --jd-path ./jd.txt --resume-path ./resume.txt
-  python main.py --watch ../solution.cpp           Watch a file
-  python main.py --no-voice                        Text-only mode
-  python main.py --local                           Force Ollama (local, slower)
+    python main.py                                  Start (uses Groq if GROQ_API_KEY set)
+    GROQ_API_KEY=your-groq-api-key python main.py   Pass API key inline
+    python main.py --jd-path ./jd.txt --resume-path ./resume.txt
+    python main.py --watch ../solution.cpp           Watch a file
+    python main.py --no-voice                        Text-only mode
+    python main.py --local                           Force Ollama (local, slower)
         """,
     )
     parser.add_argument("--topic", type=str, help="Optional preferred topic to append into context")
@@ -93,7 +93,7 @@ def main():
             ui.print_info("")
             ui.print_info("Option 1 (recommended): Set GROQ_API_KEY for free ultra-fast AI")
             ui.print_info("  Get your free key at: https://console.groq.com")
-            ui.print_info("  Then run: GROQ_API_KEY=gsk_... python main.py")
+            ui.print_info("  Then run: GROQ_API_KEY=your-groq-api-key python main.py")
             ui.print_info("")
             ui.print_info("Option 2: Start Ollama locally")
             ui.print_info(f"  ollama serve && ollama pull {ollama_model}")
