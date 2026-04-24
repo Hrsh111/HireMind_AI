@@ -6,9 +6,16 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 QUESTIONS_DIR = BASE_DIR / "questions"
 
+
+
 # Groq API settings (FREE — get key at console.groq.com)
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "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")
+from dotenv import load_dotenv
+load_dotenv()
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 GROQ_MODEL = "llama-3.3-70b-versatile"  # Fast & smart. Alt: "llama-3.1-8b-instant" (faster)
+
+# Google Cloud Service Account JSON path (load from env)
+GOOGLE_APPLICATION_CREDENTIALS = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
 
 # Fallback: Ollama (local, slower)
 OLLAMA_URL = "http://localhost:11434"
