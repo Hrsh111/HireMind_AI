@@ -22,10 +22,26 @@ from livekit.plugins import silero
 from openrouter_client import OpenRouterClient
 from storage import SessionStore
 
-load_dotenv(Path(__file__).resolve().parent.parent / ".env.local")
-
 logger = logging.getLogger("algo-agent")
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
+
+
+def _load_env() -> None:
+    project_root = Path(__file__).resolve().parent.parent
+    env_local = project_root / ".env.local"
+    env_default = project_root / ".env"
+    if env_local.exists():
+        load_dotenv(env_local)
+    elif env_default.exists():
+        logger.warning(".env.local not found; falling back to .env")
+        load_dotenv(env_default)
+    else:
+        logger.warning("Neither .env.local nor .env found; relying on process environment.")
+    if not os.getenv("OPENROUTER_API_KEY"):
+        logger.warning("OPENROUTER_API_KEY is not set; LLM calls will fail.")
+
+
+_load_env()
 
 RoundType = Literal["resume_grill", "dsa", "systems", "behavioral"]
 NextAction = Literal["follow_up", "switch_topic", "end"]
@@ -144,7 +160,11 @@ Return JSON:
   "weak_areas": ["area 1", "area 2"]
 }}
 """
-        result = await llm.json_chat(system, user, fallback=fallback)
+        try:
+            result = await llm.json_chat(system, user, fallback=fallback)
+        except Exception as exc:
+            logger.error("[Agent] Evaluator LLM call failed: %s", exc)
+            result = fallback
         scores = list(state["scores"]) + list(result.get("scores", []))
         weak_areas = list(dict.fromkeys(list(state["weak_areas"]) + list(result.get("weak_areas", []))))[:8]
         return {**state, "scores": scores[-40:], "weak_areas": weak_areas}
@@ -167,7 +187,11 @@ Decide the next action. Use exactly one of: follow_up, switch_topic, end.
 Return JSON:
 {{"next_action": "follow_up|switch_topic|end", "reason": "short reason"}}
 """
-        result = await llm.json_chat(system, user, fallback=fallback)
+        try:
+            result = await llm.json_chat(system, user, fallback=fallback)
+        except Exception as exc:
+            logger.error("[Agent] Tracker LLM call failed: %s", exc)
+            result = fallback
         next_action = str(result.get("next_action", "follow_up"))
         if next_action not in {"follow_up", "switch_topic", "end"}:
             next_action = "follow_up"
@@ -201,7 +225,11 @@ Rules:
 - For resume grill, challenge a concrete project or metric from the resume.
 - Keep it under 70 words.
 """
-        text = await llm.chat(system, user, temperature=0.45, max_tokens=220)
+        try:
+            text = await llm.chat(system, user, temperature=0.45, max_tokens=220)
+        except Exception as exc:
+            logger.error("[Agent] Questioner LLM call failed: %s", exc)
+            text = "Let's keep going. Can you walk me through your reasoning in more detail?"
         return {**state, "questioner_text": text}
 
     graph.add_node("Evaluator", evaluator)

@@ -83,11 +83,6 @@ def parse_interview_context(jd_text, resume_text):
     if not jd and not resume:
         return dict(DEFAULT_CONTEXT)
 
-    llm = LLMClient(api_key=GROQ_API_KEY, model=GROQ_MODEL)
-    llm.set_system_prompt(
-        "You are a strict JSON generator for interview setup. "
-        "Return valid JSON only with no markdown, notes, or extra text."
-    )
     prompt = f"""\
 You are preparing a DSA/systems interview based on the candidate's resume and a job description.
 
@@ -113,6 +108,16 @@ Resume:
 {resume if resume else "(not provided)"}
 """
 
-    raw = llm.chat(prompt, stream=False)
+    try:
+        llm = LLMClient(api_key=GROQ_API_KEY, model=GROQ_MODEL)
+        llm.set_system_prompt(
+            "You are a strict JSON generator for interview setup. "
+            "Return valid JSON only with no markdown, notes, or extra text."
+        )
+        raw = llm.chat(prompt, stream=False)
+    except Exception as exc:  # network/auth/provider errors -> safe default
+        print(f"[context] Could not parse interview context via LLM ({exc}); using defaults.")
+        return dict(DEFAULT_CONTEXT)
+
     parsed = _extract_json_object(raw)
     return _sanitize_context(parsed)

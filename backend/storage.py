@@ -5,9 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+from datetime import datetime
 from typing import Any
 
 import psycopg
+from psycopg.rows import dict_row
 
 logger = logging.getLogger("algo-storage")
 
@@ -154,15 +156,131 @@ class SessionStore:
                     """
                     INSERT INTO skill_graphs (session_id, skill, score, evidence)
                     VALUES (%s, %s, %s, %s)
-                    ON CONFLICT DO NOTHING;
+                    ON CONFLICT (session_id, skill) DO UPDATE SET
+                        score = EXCLUDED.score,
+                        evidence = EXCLUDED.evidence,
+                        updated_at = now();
                     """,
                     (session_id, skill, score, evidence),
                 )
-                cur.execute(
-                    """
-                    UPDATE skill_graphs
-                    SET score = %s, evidence = %s, updated_at = now()
-                    WHERE session_id = %s AND skill = %s;
-                    """,
-                    (score, evidence, session_id, skill),
-                )
+
+    async def get_session(self, session_id: str) -> dict[str, Any] | None:
+        if not self.enabled:
+            return None
+        import asyncio
+
+        return await asyncio.to_thread(self._get_session_sync, session_id)
+
+    def _get_session_sync(self, session_id: str) -> dict[str, Any] | None:
+        with self._connect() as conn, conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM interview_sessions WHERE id = %s;", (session_id,))
+            return cur.fetchone()
+
+    async def list_sessions(self, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+        if not self.enabled:
+            return []
+        import asyncio
+
+        return await asyncio.to_thread(self._list_sessions_sync, limit, offset)
+
+    def _list_sessions_sync(self, limit: int, offset: int) -> list[dict[str, Any]]:
+        with self._connect() as conn, conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT * FROM interview_sessions
+                ORDER BY created_at DESC
+                LIMIT %s OFFSET %s;
+                """,
+                (limit, offset),
+            )
+            return cur.fetchall()
+
+    async def get_events(self, session_id: str) -> list[dict[str, Any]]:
+        if not self.enabled:
+            return []
+        import asyncio
+
+        return await asyncio.to_thread(self._get_events_sync, session_id)
+
+    def _get_events_sync(self, session_id: str) -> list[dict[str, Any]]:
+        with self._connect() as conn, conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                SELECT * FROM session_events
+                WHERE session_id = %s
+                ORDER BY created_at ASC;
+                """,
+                (session_id,),
+            )
+            return cur.fetchall()
+
+    async def get_skill_scores(self, session_id: str) -> list[dict[str, Any]]:
+        if not self.enabled:
+            return []
+        import asyncio
+
+        return await asyncio.to_thread(self._get_skill_scores_sync, session_id)
+
+    def _get_skill_scores_sync(self, session_id: str) -> list[dict[str, Any]]:
+        with self._connect() as conn, conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                "SELECT * FROM skill_graphs WHERE session_id = %s;",
+                (session_id,),
+            )
+            return cur.fetchall()
+
+    async def delete_session(self, session_id: str) -> None:
+        if not self.enabled:
+            return
+        import asyncio
+
+        await asyncio.to_thread(self._delete_session_sync, session_id)
+
+    def _delete_session_sync(self, session_id: str) -> None:
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute("DELETE FROM interview_sessions WHERE id = %s;", (session_id,))
+
+    async def export_session(self, session_id: str) -> dict[str, Any]:
+        if not self.enabled:
+            return {}
+        import asyncio
+
+        return await asyncio.to_thread(self._export_session_sync, session_id)
+
+    def _export_session_sync(self, session_id: str) -> dict[str, Any]:
+        with self._connect() as conn, conn.cursor(row_factory=dict_row) as cur:
+            cur.execute("SELECT * FROM interview_sessions WHERE id = %s;", (session_id,))
+            session = cur.fetchone()
+            if not session:
+                return {}
+            cur.execute(
+                """
+                SELECT * FROM session_events
+                WHERE session_id = %s
+                ORDER BY created_at ASC;
+                """,
+                (session_id,),
+            )
+            events = cur.fetchall()
+            cur.execute(
+                "SELECT * FROM skill_graphs WHERE session_id = %s;",
+                (session_id,),
+            )
+            skill_scores = cur.fetchall()
+        return {
+            "session": _jsonable(session),
+            "events": [_jsonable(row) for row in events],
+            "skill_scores": [_jsonable(row) for row in skill_scores],
+        }
+
+
+def _jsonable(row: dict[str, Any] | None) -> dict[str, Any]:
+    if not row:
+        return {}
+    result: dict[str, Any] = {}
+    for key, value in row.items():
+        if isinstance(value, datetime):
+            result[key] = value.isoformat()
+        else:
+            result[key] = value
+    return result

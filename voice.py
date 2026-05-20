@@ -1,30 +1,74 @@
 """Voice pipeline: Text-to-Speech and Speech-to-Text."""
 
+import shutil
 import subprocess
+import sys
 import threading
 import tempfile
 import wave
 import io
-import numpy as np
 from config import TTS_RATE, STT_MODEL, RECORD_SAMPLE_RATE, SILENCE_THRESHOLD, SILENCE_DURATION
 
 
+def _detect_tts_engine() -> str | None:
+    """Pick an available system TTS command for the current platform."""
+    if sys.platform == "darwin" and shutil.which("say"):
+        return "say"
+    if sys.platform.startswith("linux"):
+        for cmd in ("espeak-ng", "espeak"):
+            if shutil.which(cmd):
+                return cmd
+    if sys.platform.startswith("win") and shutil.which("powershell"):
+        return "powershell"
+    return None
+
+
 class TTS:
-    """Text-to-Speech using macOS native `say` command."""
+    """Cross-platform Text-to-Speech via the OS's native voice engine.
+
+    Uses macOS `say`, Linux `espeak-ng`/`espeak`, or Windows PowerShell
+    System.Speech. Falls back to a silent no-op when none is available.
+    """
 
     def __init__(self):
         self._speaking = False
         self._process = None
+        self._engine = _detect_tts_engine()
+        if self._engine is None:
+            print("[voice] No system TTS engine found; speech output disabled.")
+            print("        On Linux install espeak-ng (e.g. `apt-get install espeak-ng`).")
+
+    @property
+    def available(self) -> bool:
+        return self._engine is not None
+
+    def _build_command(self, text: str) -> list[str] | None:
+        if self._engine == "say":
+            return ["say", "-r", str(TTS_RATE), text]
+        if self._engine in ("espeak-ng", "espeak"):
+            return [self._engine, "-s", str(TTS_RATE), text]
+        if self._engine == "powershell":
+            escaped = text.replace("'", "''")
+            script = (
+                "Add-Type -AssemblyName System.Speech; "
+                "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+                f"$s.Speak('{escaped}')"
+            )
+            return ["powershell", "-NoProfile", "-Command", script]
+        return None
 
     def speak(self, text: str):
         """Speak text aloud. Blocks until done."""
-        if not text or text.strip() == "...":
+        if not text or text.strip() == "..." or self._engine is None:
             return
         clean = text.replace("`", "").replace("*", "").replace("#", "")
+        command = self._build_command(clean)
+        if not command:
+            return
         self._speaking = True
         try:
             self._process = subprocess.Popen(
-                ["say", "-r", str(TTS_RATE), clean],
+                command,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -116,9 +160,10 @@ class STT:
             return ""
 
         try:
+            import numpy as np
             import sounddevice as sd
         except ImportError:
-            print("[voice] sounddevice not installed. Install: pip install sounddevice")
+            print("[voice] numpy/sounddevice not installed. Install: pip install numpy sounddevice")
             return ""
 
         print("\n  [Listening... speak now, stay silent to stop]\n")

@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from code_analysis import analyze_code
 from llm import LLMClient
 
 
@@ -237,6 +238,38 @@ def generate_pdf_report(
     story.append(Paragraph("Target Competencies", heading_style))
     story.append(Paragraph(", ".join(competencies[:3]) if competencies else "Not available", body_style))
     story.append(Spacer(1, 0.15 * inch))
+
+    story.append(Paragraph("Static Code Analysis", heading_style))
+    analysis = analyze_code(final_code or "")
+    a_metrics = analysis.get("metrics", {})
+    a_heur = analysis.get("heuristics", {})
+    if analysis.get("parse_ok") and a_metrics.get("code_lines"):
+        analysis_rows = [
+            ["Metric", "Value"],
+            ["Cyclomatic complexity", str(a_metrics.get("cyclomatic_complexity", 0))],
+            ["Functions / Classes", f"{a_metrics.get('functions', 0)} / {a_metrics.get('classes', 0)}"],
+            ["Loops (max nesting)", f"{a_metrics.get('loops', 0)} ({a_metrics.get('max_loop_depth', 0)})"],
+            ["Recursion", "yes" if a_metrics.get("has_recursion") else "no"],
+            ["Estimated time", str(a_heur.get("estimated_time", "n/a"))],
+            ["Estimated space", str(a_heur.get("estimated_space", "n/a"))],
+        ]
+        analysis_table = Table(analysis_rows, colWidths=[2.0 * inch, 4.4 * inch])
+        analysis_table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1d4ed8")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+                ]
+            )
+        )
+        story.append(analysis_table)
+    else:
+        story.append(Paragraph(str(analysis.get("summary", "No analyzable code.")), body_style))
+    story.append(Spacer(1, 0.18 * inch))
 
     story.append(Paragraph("Final Code Snapshot", heading_style))
     code_excerpt = (final_code or "(no code submitted)").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")

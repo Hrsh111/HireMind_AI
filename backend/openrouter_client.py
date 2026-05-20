@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import os
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger("algo-openrouter")
+
+_MAX_ATTEMPTS = 3
+_BACKOFF_SECONDS = (0.5, 1.0, 2.0)
 
 
 class OpenRouterClient:
@@ -37,14 +44,44 @@ class OpenRouterClient:
             "X-Title": self.app_name,
         }
 
-        async with httpx.AsyncClient(timeout=25) as client:
-            response = await client.post(f"{self.base_url}/chat/completions", json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            return data["choices"][0]["message"]["content"].strip()
+        last_exc: Exception | None = None
+        for attempt in range(_MAX_ATTEMPTS):
+            try:
+                async with httpx.AsyncClient(timeout=25) as client:
+                    response = await client.post(
+                        f"{self.base_url}/chat/completions", json=payload, headers=headers
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                    return data["choices"][0]["message"]["content"].strip()
+            except httpx.HTTPStatusError as exc:
+                last_exc = exc
+                status = exc.response.status_code
+                if status < 500:
+                    raise  # do not retry client (4xx) errors
+            except httpx.HTTPError as exc:
+                last_exc = exc
+
+            if attempt < _MAX_ATTEMPTS - 1:
+                delay = _BACKOFF_SECONDS[attempt]
+                logger.warning(
+                    "OpenRouter chat attempt %d/%d failed (%s); retrying in %.1fs.",
+                    attempt + 1,
+                    _MAX_ATTEMPTS,
+                    last_exc,
+                    delay,
+                )
+                await asyncio.sleep(delay)
+
+        assert last_exc is not None
+        raise last_exc
 
     async def json_chat(self, system: str, user: str, *, fallback: dict[str, Any]) -> dict[str, Any]:
-        raw = await self.chat(system, user, temperature=0.1, max_tokens=650)
+        try:
+            raw = await self.chat(system, user, temperature=0.1, max_tokens=650)
+        except httpx.HTTPError as exc:
+            logger.warning("OpenRouter json_chat failed after retries (%s); using fallback.", exc)
+            return fallback
         try:
             return json.loads(raw)
         except json.JSONDecodeError:

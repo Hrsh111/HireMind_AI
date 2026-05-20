@@ -3,14 +3,14 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 BASE_DIR = Path(__file__).parent
 QUESTIONS_DIR = BASE_DIR / "questions"
 
-
-
 # Groq API settings (FREE — get key at console.groq.com)
-from dotenv import load_dotenv
-load_dotenv()
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 GROQ_MODEL = "llama-3.3-70b-versatile"  # Fast & smart. Alt: "llama-3.1-8b-instant" (faster)
 
@@ -23,7 +23,7 @@ OLLAMA_MODEL = "llama3.2:3b"
 
 # Voice settings
 VOICE_ENABLED = True
-TTS_RATE = 190  # Words per minute for macOS say
+TTS_RATE = 190  # Words per minute for the system TTS engine
 STT_MODEL = "tiny"  # Whisper model: tiny (fastest), base, small
 RECORD_SAMPLE_RATE = 16000
 SILENCE_THRESHOLD = 0.01
